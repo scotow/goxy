@@ -1,0 +1,23 @@
+<html>
+<head>
+    <script>
+        const array = new ArrayBuffer(16);
+        array[0] = 5;
+
+        conn = new WebSocket("ws://127.0.0.1:8080/ws");
+        conn.onclose = function (evt) {
+            console.error("Connection closed.");
+        };
+        conn.onmessage = function (evt) {
+            console.log(evt.data);
+        };
+
+        setInterval(() => {
+            conn.send("Hello, World\n");
+        }, 2500)
+    </script>
+</head>
+<body>
+<h1><pre>WS</pre></h1>
+</body>
+</html>
