@@ -33,13 +33,13 @@ func initSsh() {
 	}
 }
 
-func handleOutput(w http.ResponseWriter, r *http.Request) {
+func handleOutput(w http.ResponseWriter, _ *http.Request) {
 	log.Println("Handling output...")
 
 	io.Copy(w, &buffer)
 }
 
-func handleInput(w http.ResponseWriter, r *http.Request) {
+func handleInput(_ http.ResponseWriter, r *http.Request) {
 	log.Println("Handling input...")
 
 	defer r.Body.Close()
