@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -11,39 +10,35 @@ import (
 )
 
 var (
-//conn *net.TCPConn
-//buffer *bytes.Buffer
+	conn   *net.TCPConn
+	buffer bytes.Buffer
 )
 
 func fetchData() {
-	time.Sleep(time.Millisecond * 1000)
+	time.Sleep(time.Millisecond * 250)
 	for {
+		log.Println("Fetching data over HTTP...")
+
 		resp, err := http.Get("http://localhost:8080/")
 		if err != nil {
 			log.Panicln(err)
 		}
 
-		//io.Copy(conn, resp.Body)
-		resp.Body.Close()
-		time.Sleep(time.Millisecond * 2000)
+		io.Copy(conn, resp.Body)
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
-func sendData(buffer *bytes.Buffer) {
+func sendData() {
 	for {
-		/*fmt.Println(buffer.Len())
+		log.Println("Sending data over HTTP...")
+
 		_, err := http.Post("http://localhost:8080/", "application/octet-stream", &buffer)
 		if err != nil {
 			log.Panicln(err)
 		}
-		fmt.Println(buffer.Len())
 
-		fmt.Println("Sending data over HTTP")*/
-
-		time.Sleep(time.Millisecond * 2000)
-		log.Println("Before copy", buffer.Len())
-		io.Copy(ioutil.Discard, buffer)
-		log.Println("After copy", buffer.Len())
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
@@ -62,13 +57,14 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
+	conn = c
 
-	var buffer bytes.Buffer
+	go sendData()
+	go fetchData()
 
-	//conn = c
-
-	//go fetchData()
-	go sendData(&buffer)
-
-	io.Copy(&buffer, c)
+	b := make([]byte, 1)
+	for {
+		conn.Read(b)
+		buffer.Write(b)
+	}
 }

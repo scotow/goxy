@@ -10,40 +10,43 @@ import (
 )
 
 var (
-	buffer  bytes.Buffer
-	sshConn *net.TCPConn
+	buffer bytes.Buffer
+	conn   *net.TCPConn
 )
 
 func initSsh() {
-	addr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:5555")
+	addr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:22")
 	if err != nil {
 		log.Panic(err)
 	}
 
-	conn, err := net.DialTCP("tcp4", nil, addr)
+	c, err := net.DialTCP("tcp4", nil, addr)
 	if err != nil {
 		log.Panic(err)
 	}
+	conn = c
 
-	sshConn = conn
-	io.Copy(&buffer, sshConn)
+	b := make([]byte, 1)
+	for {
+		conn.Read(b)
+		buffer.Write(b)
+	}
 }
 
 func handleOutput(w http.ResponseWriter, r *http.Request) {
+	log.Println("Handling output...")
+
 	io.Copy(w, &buffer)
 }
 
 func handleInput(w http.ResponseWriter, r *http.Request) {
-	log.Println("Handling input....")
+	log.Println("Handling input...")
+
 	defer r.Body.Close()
-	io.Copy(sshConn, r.Body)
+	io.Copy(conn, r.Body)
 }
 
 func main() {
-	// Listen on /comment for HTTP post
-	// Send data received on /comment to stdout
-	// On each HTTP get request on /video sends buffer
-
 	go initSsh()
 
 	r := mux.NewRouter()
