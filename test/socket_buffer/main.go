@@ -43,9 +43,9 @@ func main() {
 
 	go sendData()
 
-	b := make([]byte, 1)
+	b := make([]byte, 16)
 	for {
-		conn.Read(b)
-		buffer.Write(b)
+		n, _ := conn.Read(b)
+		buffer.Write(b[:n])
 	}
 }
