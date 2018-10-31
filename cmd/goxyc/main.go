@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	goxy "github.com/scotow/goxy/client"
 )
 
 var (
@@ -42,7 +44,7 @@ func sendData() {
 	}
 }
 
-func main() {
+func Main() {
 	addr, err := net.ResolveTCPAddr("tcp", ":2222")
 	if err != nil {
 		log.Panic(err)
@@ -67,4 +69,10 @@ func main() {
 		n, _ := conn.Read(b)
 		buffer.Write(b[:n])
 	}
+}
+
+func main() {
+	client, _ := goxy.NewClient(2222, "localhost:80", "localhost:5555")
+	client.WaitUntilServerUp(time.Second)
+	client.Start()
 }

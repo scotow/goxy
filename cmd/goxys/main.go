@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net"
 	"net/http"
+
+	goxy "github.com/scotow/goxy/server"
 )
 
 var (
@@ -47,11 +48,14 @@ func handleInput(_ http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	go initSsh()
+	//go initSsh()
 
-	r := mux.NewRouter()
-	r.HandleFunc("/", handleOutput).Methods("GET")
-	r.HandleFunc("/", handleInput).Methods("POST")
-	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(":8080", r))
+	//r := mux.NewRouter()
+	//r.HandleFunc("/", handleOutput).Methods("GET")
+	//r.HandleFunc("/", handleInput).Methods("POST")
+	//http.Handle("/", r)
+	//log.Fatal(http.ListenAndServe(":8080", r))*/
+
+	server, _ := goxy.NewServer(":80")
+	server.Start()
 }
