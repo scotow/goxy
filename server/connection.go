@@ -16,7 +16,7 @@ func newConnection() (*connection, error) {
 	c := connection{}
 	c.internalBuffer = make([]byte, 1024)
 
-	addr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:22")
+	addr, err := net.ResolveTCPAddr("tcp4", "localhost:22")
 	if err != nil {
 		log.Panic(err)
 	}

@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"time"
@@ -24,7 +25,7 @@ func NewClient(localPort int, httpAddr, remoteAddr string) (*Client, error) {
 }
 
 func (c *Client) CheckServerStatus() bool {
-	resp, err := http.Get(fmt.Sprintf("%s/%s", c.httpAddr, "status"))
+	resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, "status"))
 	if err != nil {
 		return false
 	}
@@ -44,12 +45,14 @@ func (c *Client) CheckServerStatus() bool {
 
 func (c *Client) WaitUntilServerUp(retryInterval time.Duration) {
 	for !c.CheckServerStatus() {
+
 		time.Sleep(retryInterval)
 	}
+	log.Println("Remote server up and running.")
 }
 
 func (c *Client) Start() error {
-	addr, err := net.ResolveTCPAddr("tcp", ":2222")
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", c.localPort))
 	if err != nil {
 		return err
 	}
@@ -75,6 +78,8 @@ func (c *Client) Start() error {
 		}
 
 		go func() {
+			go conn.waitForOutput()
+
 			interval := time.Millisecond * 500
 			go conn.sendData(interval)
 			time.Sleep(interval / 2)

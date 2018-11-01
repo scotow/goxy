@@ -52,11 +52,25 @@ func (c *connection) AskForConnection() error {
 	return nil
 }
 
+func (c *connection) buffOutput() error {
+	n, err := c.tcpConn.Read(c.internalBuffer)
+	c.outputBuffer.Write(c.internalBuffer[:n])
+	return err
+}
+
+func (c *connection) waitForOutput() error {
+	var err error
+	for err == nil {
+		err = c.buffOutput()
+	}
+	return err
+}
+
 func (c *connection) fetchData(interval time.Duration) error {
 	for {
 		//log.Println("Fetching data over HTTP...")
 
-		resp, err := http.Get("http://localhost:8080/")
+		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 		if err != nil {
 			return err
 		}
@@ -70,7 +84,7 @@ func (c *connection) sendData(interval time.Duration) error {
 	for {
 		//log.Println("Sending data over HTTP...")
 
-		_, err := http.Post("http://localhost:8080/", "application/octet-stream", &c.outputBuffer)
+		_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
 		if err != nil {
 			return err
 		}

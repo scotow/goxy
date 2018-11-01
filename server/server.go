@@ -3,7 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/gorilla/mux"
-	"log"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,14 +23,13 @@ func NewServer(httpAddr string) (*Server, error) {
 
 	s.router.HandleFunc("/status", s.status).Methods("GET")
 	s.router.HandleFunc("/create", s.create).Methods("GET", "POST")
-	s.router.HandleFunc("/", s.input).Methods("POST")
-	s.router.HandleFunc("/", s.output).Methods("GET")
+	s.router.PathPrefix("/").HandlerFunc(s.input).Methods("POST")
+	s.router.PathPrefix("/").HandlerFunc(s.output).Methods("GET")
 
 	return &s, nil
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
-	log.Println(s.httpAddr)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "OK")
 }
@@ -45,21 +44,33 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.connections[id] = conn
+	go conn.waitForOutput()
+
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, id)
 }
 
 func (s *Server) input(w http.ResponseWriter, r *http.Request) {
-	log.Println("Input id:", r.Header.Get("X-Id"))
+	//log.Println("Input id:", r.Header.Get("X-Id"))
+	id := r.RequestURI[1:]
+	//log.Println("Input id:", id)
+
+	conn := s.connections[id]
+
+	defer r.Body.Close()
+	io.Copy(conn.tcpConn, r.Body)
 }
 
 func (s *Server) output(w http.ResponseWriter, r *http.Request) {
-	log.Println("Output id:", r.Header.Get("X-Id"))
-	//defer r.Body.Close()
-	//io.Copy(conn, r.Body)
+	//log.Println("Output id:", r.Header.Get("X-Id"))
+	id := r.RequestURI[1:]
+	//log.Println("Output id:", id)
+
+	conn := s.connections[id]
+
+	io.Copy(w, &conn.outputBuffer)
 }
 
 func (s *Server) Start() error {
-	//http.Handle("/", s.router)
 	return http.ListenAndServe(s.httpAddr, s.router)
 }
