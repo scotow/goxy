@@ -45,7 +45,6 @@ func (c *Client) CheckServerStatus() bool {
 
 func (c *Client) WaitUntilServerUp(retryInterval time.Duration) {
 	for !c.CheckServerStatus() {
-
 		time.Sleep(retryInterval)
 	}
 	log.Println("Remote server up and running.")
@@ -80,9 +79,8 @@ func (c *Client) Start() error {
 		go func() {
 			go conn.waitForOutput()
 
-			interval := time.Millisecond * 500
+			interval := time.Millisecond * 50
 			go conn.sendData(interval)
-			time.Sleep(interval / 2)
 			conn.fetchData(interval)
 		}()
 	}

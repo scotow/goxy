@@ -68,7 +68,9 @@ func (s *Server) output(w http.ResponseWriter, r *http.Request) {
 
 	conn := s.connections[id]
 
+	conn.bufferLock.Lock()
 	io.Copy(w, &conn.outputBuffer)
+	conn.bufferLock.Unlock()
 }
 
 func (s *Server) Start() error {

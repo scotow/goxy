@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -18,9 +19,10 @@ var (
 type connection struct {
 	tcpConn  *net.TCPConn
 	httpAddr string
+	id       string
 
-	id             string
 	outputBuffer   bytes.Buffer
+	bufferLock     sync.Mutex
 	internalBuffer []byte
 }
 
@@ -54,7 +56,9 @@ func (c *connection) AskForConnection() error {
 
 func (c *connection) buffOutput() error {
 	n, err := c.tcpConn.Read(c.internalBuffer)
+	c.bufferLock.Lock()
 	c.outputBuffer.Write(c.internalBuffer[:n])
+	c.bufferLock.Unlock()
 	return err
 }
 
@@ -68,27 +72,36 @@ func (c *connection) waitForOutput() error {
 
 func (c *connection) fetchData(interval time.Duration) error {
 	for {
-		//log.Println("Fetching data over HTTP...")
-
 		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 		if err != nil {
 			return err
 		}
 
-		io.Copy(c.tcpConn, resp.Body)
-		time.Sleep(interval)
+		n, err := io.Copy(c.tcpConn, resp.Body)
+		if n == 0 {
+			time.Sleep(interval * 2)
+		} else {
+			time.Sleep(interval)
+		}
 	}
 }
 
 func (c *connection) sendData(interval time.Duration) error {
 	for {
-		//log.Println("Sending data over HTTP...")
+		c.bufferLock.Lock()
 
-		_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
-		if err != nil {
-			return err
+		if c.outputBuffer.Len() == 0 {
+			time.Sleep(interval * 2)
+			c.bufferLock.Unlock()
+		} else {
+			_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
+			c.bufferLock.Unlock()
+
+			if err != nil {
+				return err
+			}
+
+			time.Sleep(interval)
 		}
-
-		time.Sleep(interval)
 	}
 }

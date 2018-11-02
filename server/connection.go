@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"log"
 	"net"
+	"sync"
 )
 
 type connection struct {
-	tcpConn        *net.TCPConn
+	tcpConn *net.TCPConn
+
+	bufferLock     sync.Mutex
 	outputBuffer   bytes.Buffer
 	internalBuffer []byte
 }
@@ -31,7 +34,9 @@ func newConnection() (*connection, error) {
 
 func (c *connection) buffOutput() error {
 	n, err := c.tcpConn.Read(c.internalBuffer)
+	c.bufferLock.Lock()
 	c.outputBuffer.Write(c.internalBuffer[:n])
+	c.bufferLock.Unlock()
 	return err
 }
 
