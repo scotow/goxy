@@ -1,13 +1,22 @@
 package main
 
 import (
+	"flag"
 	"time"
 
 	goxy "github.com/scotow/goxy/client"
 )
 
+var (
+	localTCP   = flag.Int("p", 2222, "local listening TCP port")
+	remoteHTTP = flag.String("h", "localhost:8080", "remote goxy server HTTP address (host:port)")
+	remoteTCP  = flag.String("r", "localhost:22", "remote TCP address (host:port)")
+)
+
 func main() {
-	client, _ := goxy.NewClient(2222, "localhost:80", "localhost:22")
+	flag.Parse()
+
+	client, _ := goxy.NewClient(*localTCP, *remoteHTTP, *remoteTCP)
 	client.WaitUntilServerUp(time.Second)
 	client.Start()
 }
