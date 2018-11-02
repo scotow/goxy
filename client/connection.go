@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+const (
+	fetchInterval = time.Millisecond * 50
+)
+
 var (
 	ErrSessionCreation = errors.New("cannot create session with the server")
 )
@@ -24,6 +28,7 @@ type connection struct {
 	outputBuffer   bytes.Buffer
 	bufferLock     sync.Mutex
 	internalBuffer []byte
+	dynamicSleep   *dynamicSleep
 }
 
 func newConnection(tcpConn *net.TCPConn, httpAddr string) (*connection, error) {
@@ -31,6 +36,7 @@ func newConnection(tcpConn *net.TCPConn, httpAddr string) (*connection, error) {
 	c.tcpConn = tcpConn
 	c.httpAddr = httpAddr
 	c.internalBuffer = make([]byte, 1024)
+	c.dynamicSleep = newDynamicSleep(fetchInterval, 10)
 
 	return &c, nil
 }
@@ -70,7 +76,7 @@ func (c *connection) waitForOutput() error {
 	return err
 }
 
-func (c *connection) fetchData(interval time.Duration) error {
+func (c *connection) fetchData() error {
 	for {
 		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 		if err != nil {
@@ -79,20 +85,20 @@ func (c *connection) fetchData(interval time.Duration) error {
 
 		n, err := io.Copy(c.tcpConn, resp.Body)
 		if n == 0 {
-			time.Sleep(interval * 2)
+			c.dynamicSleep.sleepIncrement()
 		} else {
-			time.Sleep(interval)
+			c.dynamicSleep.sleepReset()
 		}
 	}
 }
 
-func (c *connection) sendData(interval time.Duration) error {
+func (c *connection) sendData() error {
 	for {
 		c.bufferLock.Lock()
 
 		if c.outputBuffer.Len() == 0 {
-			time.Sleep(interval * 2)
 			c.bufferLock.Unlock()
+			c.dynamicSleep.sleepOriginal()
 		} else {
 			_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
 			c.bufferLock.Unlock()
@@ -101,7 +107,7 @@ func (c *connection) sendData(interval time.Duration) error {
 				return err
 			}
 
-			time.Sleep(interval)
+			c.dynamicSleep.sleepReset()
 		}
 	}
 }

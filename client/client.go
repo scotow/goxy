@@ -79,9 +79,8 @@ func (c *Client) Start() error {
 		go func() {
 			go conn.waitForOutput()
 
-			interval := time.Millisecond * 50
-			go conn.sendData(interval)
-			conn.fetchData(interval)
+			go conn.sendData()
+			conn.fetchData()
 		}()
 	}
 }
