@@ -11,14 +11,14 @@ import (
 )
 
 type Client struct {
-	localPort  int
+	localAddr  string
 	httpAddr   string
 	remoteAddr string
 }
 
-func NewClient(localPort int, httpAddr, remoteAddr string) (*Client, error) {
+func NewClient(localAddr string, httpAddr, remoteAddr string) (*Client, error) {
 	c := Client{}
-	c.localPort = localPort
+	c.localAddr = localAddr
 	c.httpAddr = httpAddr
 	c.remoteAddr = remoteAddr
 
@@ -48,32 +48,39 @@ func (c *Client) WaitUntilServerUp(retryInterval time.Duration) {
 	for !c.CheckServerStatus() {
 		time.Sleep(retryInterval)
 	}
-	log.Infoln("Remote server up and running.")
+	log.WithField("address", c.httpAddr).Info("Remote server up and running.")
 }
 
 func (c *Client) Start() error {
-	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", c.localPort))
+	addr, err := net.ResolveTCPAddr("tcp", c.localAddr)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"address": c.localAddr,
+			"error":   err,
+		}).Error("Invalid listening address.")
 		return err
 	}
 
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"address": c.localAddr,
+			"error":   err,
+		}).Error("Cannot start TCP listener.")
 		return err
 	}
 
 	for {
 		tcpConn, err := listener.AcceptTCP()
 		if err != nil {
+			log.WithField("address", c.localAddr).Warn("Cannot accept TCP connection.")
 			continue
 		}
 
-		conn, err := newConnection(tcpConn, c.httpAddr, c.remoteAddr)
-		if err != nil {
-			continue
-		}
+		conn := newConnection(tcpConn, c.httpAddr, c.remoteAddr)
 
 		if err := conn.AskForConnection(); err != nil {
+			conn.tcpConn.Close()
 			continue
 		}
 

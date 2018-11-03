@@ -34,7 +34,7 @@ type connection struct {
 	dynamicSleep   *dynamicSleep
 }
 
-func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) (*connection, error) {
+func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) *connection {
 	c := connection{}
 	c.tcpConn = tcpConn
 	c.httpAddr = httpAddr
@@ -42,11 +42,11 @@ func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) (*c
 	c.internalBuffer = make([]byte, 1024)
 	c.dynamicSleep = newDynamicSleep(fetchInterval, 10)
 
-	return &c, nil
+	return &c
 }
 
 func (c *connection) AskForConnection() error {
-	reqBody := fmt.Sprintf("GOXY %s %s", common.Version, c.remoteAddr)
+	reqBody := fmt.Sprintf("%s %s %s", common.AppName, common.Version, c.remoteAddr)
 	resp, err := http.Post(fmt.Sprintf("http://%s/create", c.httpAddr), "text/plain", strings.NewReader(reqBody))
 	if err != nil {
 		return ErrSessionCreation
@@ -66,6 +66,7 @@ func (c *connection) AskForConnection() error {
 }
 
 func (c *connection) buffOutput() error {
+	// Buff local output while locking access to the buffer.
 	n, err := c.tcpConn.Read(c.internalBuffer)
 	c.bufferLock.Lock()
 	c.outputBuffer.Write(c.internalBuffer[:n])
@@ -83,16 +84,23 @@ func (c *connection) waitForOutput() error {
 
 func (c *connection) fetchData() error {
 	for {
+		// Fetch pending data from remote socket.
 		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 		if err != nil {
 			return err
 		}
 
 		n, err := io.Copy(c.tcpConn, resp.Body)
+
+		// If remote output buffer had nothing, increase next fetch interval.
 		if n == 0 {
 			c.dynamicSleep.sleepIncrement()
 		} else {
 			c.dynamicSleep.sleepReset()
+		}
+
+		if err != nil {
+			return err
 		}
 	}
 }
@@ -101,10 +109,12 @@ func (c *connection) sendData() error {
 	for {
 		c.bufferLock.Lock()
 
+		// If the output buffer is empty, don't send it.
 		if c.outputBuffer.Len() == 0 {
 			c.bufferLock.Unlock()
 			c.dynamicSleep.sleepOriginal()
 		} else {
+			// Otherwise send it and reset fetch dynamic interval.
 			_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
 			c.bufferLock.Unlock()
 

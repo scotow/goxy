@@ -6,16 +6,20 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/scotow/goxy/common"
 	log "github.com/sirupsen/logrus"
 )
 
 type Server struct {
-	httpAddr    string
-	router      *mux.Router
-	connections map[string]*connection
+	httpAddr string
+	router   *mux.Router
+
+	connectionsLock sync.RWMutex
+	connections     map[string]*connection
 }
 
 func NewServer(httpAddr string) (*Server, error) {
@@ -46,13 +50,19 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var version, remoteAddr string
+	var appName, version, remoteAddr string
 	reqString := string(reqBytes)
-	n, err := fmt.Sscanf(reqString, "GOXY %s %s", &version, &remoteAddr)
+	n, err := fmt.Sscanf(reqString, "%s %s %s", &appName, &version, &remoteAddr)
 
-	if n != 2 || err != nil {
+	if n != 3 || err != nil {
 		http.Error(w, "invalid creation request", http.StatusBadRequest)
 		log.WithField("header", reqString).Warn("Invalid creation request header.")
+		return
+	}
+
+	if appName != common.AppName || version != common.Version {
+		http.Error(w, "invalid app name or version", http.StatusBadRequest)
+		log.WithField("header", reqString).Warn("Invalid app name or version.")
 		return
 	}
 
@@ -65,7 +75,11 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add connections to map.
+	s.connectionsLock.Lock()
 	s.connections[id] = conn
+	s.connectionsLock.Unlock()
+
 	go conn.waitForOutput()
 
 	w.WriteHeader(http.StatusOK)
@@ -82,7 +96,9 @@ func (s *Server) input(w http.ResponseWriter, r *http.Request) {
 	id := r.RequestURI[1:]
 	//log.Println("Input id:", id)
 
+	s.connectionsLock.RLock()
 	conn := s.connections[id]
+	s.connectionsLock.RUnlock()
 
 	defer r.Body.Close()
 	io.Copy(conn.tcpConn, r.Body)
@@ -93,7 +109,9 @@ func (s *Server) output(w http.ResponseWriter, r *http.Request) {
 	id := r.RequestURI[1:]
 	//log.Println("Output id:", id)
 
+	s.connectionsLock.RLock()
 	conn := s.connections[id]
+	s.connectionsLock.RUnlock()
 
 	conn.bufferLock.Lock()
 	io.Copy(w, &conn.outputBuffer)

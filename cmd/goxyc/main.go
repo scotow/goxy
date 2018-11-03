@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	localTCP   = flag.Int("p", 2222, "local listening TCP port")
-	remoteHTTP = flag.String("h", "localhost:8080", "remote goxy server HTTP address (host:port)")
+	localTCP   = flag.String("l", ":2222", "local listening TCP address (host:port)")
+	remoteHTTP = flag.String("h", "localhost:8080", "remote Goxy server HTTP address (host:port)")
 	remoteTCP  = flag.String("r", "localhost:22", "remote TCP address (host:port)")
 )
 

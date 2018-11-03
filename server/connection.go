@@ -2,9 +2,14 @@ package server
 
 import (
 	"bytes"
-	"log"
+	"errors"
 	"net"
 	"sync"
+)
+
+var (
+	ErrInvalidRemoteAddress = errors.New("invalid remote TCP address")
+	ErrCannotReachRemote    = errors.New("cannot open TCP connection to remote host")
 )
 
 type connection struct {
@@ -21,12 +26,12 @@ func newConnection(address string) (*connection, error) {
 
 	addr, err := net.ResolveTCPAddr("tcp4", address)
 	if err != nil {
-		log.Panic(err)
+		return nil, ErrInvalidRemoteAddress
 	}
 
 	c.tcpConn, err = net.DialTCP("tcp4", nil, addr)
 	if err != nil {
-		return nil, err
+		return nil, ErrCannotReachRemote
 	}
 
 	return &c, nil
