@@ -3,10 +3,11 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Client struct {
@@ -47,7 +48,7 @@ func (c *Client) WaitUntilServerUp(retryInterval time.Duration) {
 	for !c.CheckServerStatus() {
 		time.Sleep(retryInterval)
 	}
-	log.Println("Remote server up and running.")
+	log.Infoln("Remote server up and running.")
 }
 
 func (c *Client) Start() error {
@@ -67,7 +68,7 @@ func (c *Client) Start() error {
 			continue
 		}
 
-		conn, err := newConnection(tcpConn, c.httpAddr)
+		conn, err := newConnection(tcpConn, c.httpAddr, c.remoteAddr)
 		if err != nil {
 			continue
 		}
@@ -76,11 +77,6 @@ func (c *Client) Start() error {
 			continue
 		}
 
-		go func() {
-			go conn.waitForOutput()
-
-			go conn.sendData()
-			conn.fetchData()
-		}()
+		go conn.start()
 	}
 }

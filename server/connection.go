@@ -15,11 +15,11 @@ type connection struct {
 	internalBuffer []byte
 }
 
-func newConnection() (*connection, error) {
+func newConnection(address string) (*connection, error) {
 	c := connection{}
 	c.internalBuffer = make([]byte, 1024)
 
-	addr, err := net.ResolveTCPAddr("tcp4", "localhost:22")
+	addr, err := net.ResolveTCPAddr("tcp4", address)
 	if err != nil {
 		log.Panic(err)
 	}

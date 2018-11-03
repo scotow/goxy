@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/scotow/goxy/common"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -21,9 +23,10 @@ var (
 )
 
 type connection struct {
-	tcpConn  *net.TCPConn
-	httpAddr string
-	id       string
+	tcpConn    *net.TCPConn
+	httpAddr   string
+	remoteAddr string
+	id         string
 
 	outputBuffer   bytes.Buffer
 	bufferLock     sync.Mutex
@@ -31,10 +34,11 @@ type connection struct {
 	dynamicSleep   *dynamicSleep
 }
 
-func newConnection(tcpConn *net.TCPConn, httpAddr string) (*connection, error) {
+func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) (*connection, error) {
 	c := connection{}
 	c.tcpConn = tcpConn
 	c.httpAddr = httpAddr
+	c.remoteAddr = remoteAddr
 	c.internalBuffer = make([]byte, 1024)
 	c.dynamicSleep = newDynamicSleep(fetchInterval, 10)
 
@@ -42,7 +46,8 @@ func newConnection(tcpConn *net.TCPConn, httpAddr string) (*connection, error) {
 }
 
 func (c *connection) AskForConnection() error {
-	resp, err := http.Get(fmt.Sprintf("http://%s/create", c.httpAddr))
+	reqBody := fmt.Sprintf("GOXY %s %s", common.Version, c.remoteAddr)
+	resp, err := http.Post(fmt.Sprintf("http://%s/create", c.httpAddr), "text/plain", strings.NewReader(reqBody))
 	if err != nil {
 		return ErrSessionCreation
 	}
@@ -110,4 +115,10 @@ func (c *connection) sendData() error {
 			c.dynamicSleep.sleepReset()
 		}
 	}
+}
+
+func (c *connection) start() {
+	go c.waitForOutput()
+	go c.sendData()
+	c.fetchData()
 }
