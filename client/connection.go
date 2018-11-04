@@ -68,9 +68,14 @@ func (c *connection) AskForConnection() error {
 func (c *connection) buffOutput() error {
 	// Buff local output while locking access to the buffer.
 	n, err := c.tcpConn.Read(c.internalBuffer)
+	if err != nil {
+		return err
+	}
+
 	c.bufferLock.Lock()
-	c.outputBuffer.Write(c.internalBuffer[:n])
-	c.bufferLock.Unlock()
+	defer c.bufferLock.Unlock()
+
+	_, err = c.outputBuffer.Write(c.internalBuffer[:n])
 	return err
 }
 

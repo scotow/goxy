@@ -30,6 +30,7 @@ func NewServer(httpAddr string) (*Server, error) {
 
 	s.router.HandleFunc("/status", s.status).Methods("GET")
 	s.router.HandleFunc("/create", s.create).Methods("POST")
+	s.router.HandleFunc("/close", s.close).Methods("GET", "POST")
 	s.router.PathPrefix("/").HandlerFunc(s.input).Methods("POST")
 	s.router.PathPrefix("/").HandlerFunc(s.output).Methods("GET", "POST")
 
@@ -40,6 +41,15 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "OK")
 	log.WithField("origin", r.RemoteAddr).Info("Received status request.")
+}
+
+func (s *Server) getConnection(r *http.Request) (*connection, string) {
+	id := r.RequestURI[1:]
+
+	s.connectionsLock.RLock()
+	defer s.connectionsLock.RUnlock()
+
+	return s.connections[id], id
 }
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +90,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	s.connections[id] = conn
 	s.connectionsLock.Unlock()
 
-	go conn.waitForOutput()
+	go s.startConnection(conn)
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, id)
@@ -92,30 +102,55 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) input(w http.ResponseWriter, r *http.Request) {
-	//log.Println("Input id:", r.Header.Get("X-Id"))
-	id := r.RequestURI[1:]
-	//log.Println("Input id:", id)
-
-	s.connectionsLock.RLock()
-	conn := s.connections[id]
-	s.connectionsLock.RUnlock()
+	conn, id := s.getConnection(r)
+	if conn == nil {
+		http.Error(w, "invalid connection id", http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"id":      id,
+			"address": r.RemoteAddr,
+		}).Warn("Invalid connection id.")
+		return
+	}
 
 	defer r.Body.Close()
 	io.Copy(conn.tcpConn, r.Body)
 }
 
 func (s *Server) output(w http.ResponseWriter, r *http.Request) {
-	//log.Println("Output id:", r.Header.Get("X-Id"))
-	id := r.RequestURI[1:]
-	//log.Println("Output id:", id)
-
-	s.connectionsLock.RLock()
-	conn := s.connections[id]
-	s.connectionsLock.RUnlock()
+	conn, id := s.getConnection(r)
+	if conn == nil {
+		http.Error(w, "invalid connection id", http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"id":      id,
+			"address": r.RemoteAddr,
+		}).Warn("Invalid connection id.")
+		return
+	}
 
 	conn.bufferLock.Lock()
 	io.Copy(w, &conn.outputBuffer)
 	conn.bufferLock.Unlock()
+}
+
+func (s *Server) close(w http.ResponseWriter, r *http.Request) {
+	conn, id := s.getConnection(r)
+	if conn == nil {
+		http.Error(w, "invalid connection id", http.StatusBadRequest)
+		log.WithFields(log.Fields{
+			"id":      id,
+			"address": r.RemoteAddr,
+		}).Warn("Invalid connection id.")
+		return
+	}
+
+	s.connectionsLock.Lock()
+	defer s.connectionsLock.Unlock()
+
+	delete(s.connections, id)
+}
+
+func (s *Server) startConnection(conn *connection) {
+	go conn.start()
 }
 
 func (s *Server) Start() error {
