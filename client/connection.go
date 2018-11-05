@@ -85,10 +85,12 @@ func (c *connection) waitForOutput() error {
 		if c.closed {
 			return c.tcpConn.Close()
 		}
+
 		err := c.buffOutput()
+
 		if err != nil {
-			fmt.Println("sending close")
 			c.closed = true
+			c.tcpConn.Close()
 			http.Get(fmt.Sprintf("http://%s/%s/close", c.httpAddr, c.id))
 			return err
 		}

@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	localHTTP = flag.String("p", ":8080", "local HTTP address used by goxy clients (address:port)")
+	localHTTP = flag.String("h", ":8080", "local HTTP address used by Goxy clients (address:port)")
 )
 
 func main() {
