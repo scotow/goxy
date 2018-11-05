@@ -30,9 +30,9 @@ func NewServer(httpAddr string) (*Server, error) {
 
 	s.router.HandleFunc("/status", s.status).Methods("GET")
 	s.router.HandleFunc("/create", s.create).Methods("POST")
-	s.router.HandleFunc("/close", s.close).Methods("GET", "POST")
-	s.router.PathPrefix("/").HandlerFunc(s.input).Methods("POST")
-	s.router.PathPrefix("/").HandlerFunc(s.output).Methods("GET", "POST")
+	s.router.HandleFunc("/{id}/close", s.close).Methods("GET", "POST")
+	s.router.HandleFunc("/{id}", s.outputClient).Methods("POST")
+	s.router.HandleFunc("/{id}", s.outputServer).Methods("GET", "POST")
 
 	return &s, nil
 }
@@ -44,7 +44,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getConnection(r *http.Request) (*connection, string) {
-	id := r.RequestURI[1:]
+	id := mux.Vars(r)["id"]
 
 	s.connectionsLock.RLock()
 	defer s.connectionsLock.RUnlock()
@@ -101,7 +101,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	}).Info("Connection created.")
 }
 
-func (s *Server) input(w http.ResponseWriter, r *http.Request) {
+func (s *Server) outputClient(w http.ResponseWriter, r *http.Request) {
 	conn, id := s.getConnection(r)
 	if conn == nil {
 		http.Error(w, "invalid connection id", http.StatusBadRequest)
@@ -112,11 +112,17 @@ func (s *Server) input(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if conn.closed {
+		http.Error(w, "connection closed", http.StatusGone)
+		s.deleteConnection(id)
+		return
+	}
+
 	defer r.Body.Close()
 	io.Copy(conn.tcpConn, r.Body)
 }
 
-func (s *Server) output(w http.ResponseWriter, r *http.Request) {
+func (s *Server) outputServer(w http.ResponseWriter, r *http.Request) {
 	conn, id := s.getConnection(r)
 	if conn == nil {
 		http.Error(w, "invalid connection id", http.StatusBadRequest)
@@ -130,10 +136,17 @@ func (s *Server) output(w http.ResponseWriter, r *http.Request) {
 	conn.bufferLock.Lock()
 	io.Copy(w, &conn.outputBuffer)
 	conn.bufferLock.Unlock()
+
+	if conn.closed {
+		http.Error(w, "connection closed", http.StatusGone)
+		s.deleteConnection(id)
+		return
+	}
 }
 
 func (s *Server) close(w http.ResponseWriter, r *http.Request) {
 	conn, id := s.getConnection(r)
+	log.Println("found close request")
 	if conn == nil {
 		http.Error(w, "invalid connection id", http.StatusBadRequest)
 		log.WithFields(log.Fields{
@@ -143,14 +156,22 @@ func (s *Server) close(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.deleteConnection(id)
+	conn.stopBuffering <- true
+}
+
+func (s *Server) startConnection(conn *connection) {
+	go conn.waitForOutput()
+
+	<-conn.socketClosed
+	conn.closed = true
+}
+
+func (s *Server) deleteConnection(id string) {
 	s.connectionsLock.Lock()
 	defer s.connectionsLock.Unlock()
 
 	delete(s.connections, id)
-}
-
-func (s *Server) startConnection(conn *connection) {
-	go conn.start()
 }
 
 func (s *Server) Start() error {

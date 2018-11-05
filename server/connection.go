@@ -18,13 +18,17 @@ type connection struct {
 	bufferLock     sync.Mutex
 	outputBuffer   bytes.Buffer
 	internalBuffer []byte
-	stop           chan bool
+
+	socketClosed  chan bool
+	stopBuffering chan bool
+	closed        bool
 }
 
 func newConnection(address string) (*connection, error) {
 	c := connection{}
 	c.internalBuffer = make([]byte, 1024)
-	c.stop = make(chan bool)
+	c.socketClosed = make(chan bool)
+	c.stopBuffering = make(chan bool)
 
 	addr, err := net.ResolveTCPAddr("tcp4", address)
 	if err != nil {
@@ -52,31 +56,18 @@ func (c *connection) buffOutput() error {
 	return err
 }
 
-func (c *connection) waitForOutput(done chan<- bool, stop <-chan bool) error {
+func (c *connection) waitForOutput() error {
 	for {
 		select {
-		case <-stop:
+		case <-c.stopBuffering:
+			c.tcpConn.Close()
 			return nil
 		default:
 			err := c.buffOutput()
 			if err != nil {
-				done <- true
+				c.socketClosed <- true
 				return err
 			}
 		}
-	}
-}
-
-func (c *connection) start() {
-	done := make(chan bool)
-	stop := make(chan bool)
-
-	go c.waitForOutput(done, stop)
-
-	select {
-	case <-done:
-
-	case <-c.stop:
-		stop <- true
 	}
 }

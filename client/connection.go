@@ -32,6 +32,7 @@ type connection struct {
 	bufferLock     sync.Mutex
 	internalBuffer []byte
 	dynamicSleep   *dynamicSleep
+	closed         bool
 }
 
 func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) *connection {
@@ -80,22 +81,44 @@ func (c *connection) buffOutput() error {
 }
 
 func (c *connection) waitForOutput() error {
-	var err error
-	for err == nil {
-		err = c.buffOutput()
+	for {
+		if c.closed {
+			return c.tcpConn.Close()
+		}
+		err := c.buffOutput()
+		if err != nil {
+			fmt.Println("sending close")
+			c.closed = true
+			http.Get(fmt.Sprintf("http://%s/%s/close", c.httpAddr, c.id))
+			return err
+		}
 	}
-	return err
 }
 
 func (c *connection) fetchData() error {
 	for {
+		if c.closed {
+			return nil
+		}
+
 		// Fetch pending data from remote socket.
 		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 		if err != nil {
+			c.closed = true
 			return err
 		}
 
 		n, err := io.Copy(c.tcpConn, resp.Body)
+
+		if err != nil {
+			c.closed = true
+			return err
+		}
+
+		if resp.StatusCode == http.StatusGone {
+			c.closed = true
+			return nil
+		}
 
 		// If remote output buffer had nothing, increase next fetch interval.
 		if n == 0 {
@@ -103,30 +126,35 @@ func (c *connection) fetchData() error {
 		} else {
 			c.dynamicSleep.sleepReset()
 		}
-
-		if err != nil {
-			return err
-		}
 	}
 }
 
 func (c *connection) sendData() error {
 	for {
+		if c.closed {
+			return nil
+		}
+
 		c.bufferLock.Lock()
 
 		// If the output buffer is empty, don't send it.
 		if c.outputBuffer.Len() == 0 {
 			c.bufferLock.Unlock()
-			c.dynamicSleep.sleepOriginal()
+			//c.dynamicSleep.sleepOriginal()
 		} else {
 			// Otherwise send it and reset fetch dynamic interval.
-			_, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
+			resp, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
 			c.bufferLock.Unlock()
 
 			if err != nil {
+				c.closed = true
 				return err
 			}
 
+			if resp.StatusCode == http.StatusGone {
+				c.closed = true
+				return nil
+			}
 			c.dynamicSleep.sleepReset()
 		}
 	}
