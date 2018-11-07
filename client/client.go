@@ -79,7 +79,7 @@ func (c *Client) Start() error {
 
 		conn := newConnection(tcpConn, c.httpAddr, c.remoteAddr)
 
-		if err := conn.AskForConnection(); err != nil {
+		if err := conn.askForConnection(); err != nil {
 			conn.tcpConn.Close()
 			continue
 		}

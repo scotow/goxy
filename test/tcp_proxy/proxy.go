@@ -7,7 +7,7 @@ import (
 )
 
 func handleConn(conn *net.TCPConn) {
-	addr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:22")
+	addr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:5555")
 	if err != nil {
 		log.Panic(err)
 	}
