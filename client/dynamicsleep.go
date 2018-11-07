@@ -18,17 +18,19 @@ func newDynamicSleep(original time.Duration, maxIteration uint64) *dynamicSleep 
 	}
 }
 
-func (d *dynamicSleep) sleepOriginal() {
-	time.Sleep(d.original)
+func (d *dynamicSleep) sleepOriginal() <-chan time.Time {
+	return time.After(d.original)
 }
 
-func (d *dynamicSleep) sleepReset() {
-	atomic.StoreUint64(&d.currentIteration, 0)
-	time.Sleep(d.original)
-}
-
-func (d *dynamicSleep) sleepIncrement() {
+func (d *dynamicSleep) sleep() <-chan time.Time {
 	i := atomic.LoadUint64(&d.currentIteration)
+	return time.After(d.original * time.Duration(i/d.maxIteration))
+}
+
+func (d *dynamicSleep) increment() {
 	atomic.AddUint64(&d.currentIteration, 1)
-	time.Sleep(d.original * time.Duration(1+i/d.maxIteration))
+}
+
+func (d *dynamicSleep) reset() {
+	atomic.StoreUint64(&d.currentIteration, 0)
 }
