@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -19,6 +21,7 @@ func handleSlow(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleFast(w http.ResponseWriter, r *http.Request) {
+	io.Copy(os.Stdout, r.Body)
 	fmt.Fprintln(w, "sending first line of data")
 	fmt.Fprintln(w, "sending second line of data")
 }

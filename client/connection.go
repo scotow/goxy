@@ -29,10 +29,10 @@ type connection struct {
 	id         string
 
 	outputBuffer   bytes.Buffer
-	bufferLock     sync.Mutex
+	lock           sync.Mutex
 	internalBuffer []byte
-	dynamicSleep   *dynamicSleep
-	closed         bool
+	//dynamicSleep   *dynamicSleep
+	//closed         bool
 }
 
 func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) *connection {
@@ -41,12 +41,12 @@ func newConnection(tcpConn *net.TCPConn, httpAddr string, remoteAddr string) *co
 	c.httpAddr = httpAddr
 	c.remoteAddr = remoteAddr
 	c.internalBuffer = make([]byte, 1024)
-	c.dynamicSleep = newDynamicSleep(fetchInterval, 10)
+	//c.dynamicSleep = newDynamicSleep(fetchInterval, 10)
 
 	return &c
 }
 
-func (c *connection) AskForConnection() error {
+func (c *connection) askForConnection() error {
 	reqBody := fmt.Sprintf("%s %s %s", common.AppName, common.Version, c.remoteAddr)
 	resp, err := http.Post(fmt.Sprintf("http://%s/create", c.httpAddr), "text/plain", strings.NewReader(reqBody))
 	if err != nil {
@@ -66,7 +66,48 @@ func (c *connection) AskForConnection() error {
 	return nil
 }
 
-func (c *connection) buffOutput() error {
+func (c *connection) start() {
+	socketClosed := make(chan error)
+	go c.pipeSocketBuffer(socketClosed)
+
+	stopFetch := make(chan bool)
+	stopSend := make(chan bool)
+	go c.fetchData(stopFetch, stopSend)
+	go c.sendData(stopSend, stopFetch)
+
+	<-socketClosed
+	stopFetch <- true
+	stopSend <- true
+	http.Get(fmt.Sprintf("http://%s/%s/close", c.httpAddr, c.id))
+}
+
+func (c *connection) pipeSocketBuffer(socketClosed chan<- error) {
+	for {
+		// Wait for some data to fill the TCP socket internal buffer.
+		n, err := c.tcpConn.Read(c.internalBuffer)
+
+		// Stop on error.
+		if err != nil {
+			c.tcpConn.Close()
+			socketClosed <- err
+			return
+		}
+
+		// Copy data while locking the buffer.
+		c.lock.Lock()
+		_, err = c.outputBuffer.Write(c.internalBuffer[:n])
+		c.lock.Unlock()
+
+		// Stop on error.
+		if err != nil {
+			c.tcpConn.Close()
+			socketClosed <- err
+			return
+		}
+	}
+}
+
+/*func (c *connection) buffOutput() error {
 	// Buff local output while locking access to the buffer.
 	n, err := c.tcpConn.Read(c.internalBuffer)
 	if err != nil {
@@ -95,75 +136,75 @@ func (c *connection) waitForOutput() error {
 			return err
 		}
 	}
-}
+}*/
 
-func (c *connection) fetchData() error {
+func (c *connection) fetchData(shouldStop <-chan bool, receiveStop chan<- bool) {
 	for {
-		if c.closed {
-			return nil
-		}
-
-		// Fetch pending data from remote socket.
-		resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
-		if err != nil {
-			c.closed = true
-			return err
-		}
-
-		n, err := io.Copy(c.tcpConn, resp.Body)
-
-		if err != nil {
-			c.closed = true
-			return err
-		}
-
-		if resp.StatusCode == http.StatusGone {
-			c.closed = true
-			return nil
-		}
-
-		// If remote output buffer had nothing, increase next fetch interval.
-		if n == 0 {
-			c.dynamicSleep.sleepIncrement()
-		} else {
-			c.dynamicSleep.sleepReset()
-		}
-	}
-}
-
-func (c *connection) sendData() error {
-	for {
-		if c.closed {
-			return nil
-		}
-
-		c.bufferLock.Lock()
-
-		// If the output buffer is empty, don't send it.
-		if c.outputBuffer.Len() == 0 {
-			c.bufferLock.Unlock()
-			//c.dynamicSleep.sleepOriginal()
-		} else {
-			// Otherwise send it and reset fetch dynamic interval.
-			resp, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
-			c.bufferLock.Unlock()
-
+		select {
+		case <-time.After(time.Second):
+			// Fetch pending data from remote socket.
+			resp, err := http.Get(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id))
 			if err != nil {
-				c.closed = true
-				return err
+				c.tcpConn.Close()
+				receiveStop <- true
+				return
+			}
+
+			_, err = io.Copy(c.tcpConn, resp.Body)
+			if err != nil {
+				c.tcpConn.Close()
+				receiveStop <- true
+				return
 			}
 
 			if resp.StatusCode == http.StatusGone {
-				c.closed = true
-				return nil
+				c.tcpConn.Close()
+				receiveStop <- true
+				return
 			}
-			c.dynamicSleep.sleepReset()
+		case <-shouldStop:
+			return
 		}
+
+		// If remote output buffer had nothing, increase next fetch interval.
+		/*if n == 0 {
+			c.dynamicSleep.sleepIncrement()
+		} else {
+			c.dynamicSleep.sleepReset()
+		}*/
 	}
 }
 
-func (c *connection) start() {
-	go c.waitForOutput()
-	go c.sendData()
-	c.fetchData()
+func (c *connection) sendData(shouldStop <-chan bool, receiveStop chan<- bool) {
+	for {
+		select {
+		case <-time.After(time.Second):
+			c.lock.Lock()
+
+			// If the output buffer is empty, don't send it.
+			if c.outputBuffer.Len() == 0 {
+				c.lock.Unlock()
+				//c.dynamicSleep.sleepOriginal()
+			} else {
+				// Otherwise send it and reset fetch dynamic interval.
+				resp, err := http.Post(fmt.Sprintf("http://%s/%s", c.httpAddr, c.id), "application/octet-stream", &c.outputBuffer)
+				c.lock.Unlock()
+
+				if err != nil {
+					c.tcpConn.Close()
+					receiveStop <- true
+					return
+				}
+
+				if resp.StatusCode == http.StatusGone {
+					c.tcpConn.Close()
+					receiveStop <- true
+					return
+				}
+				//c.dynamicSleep.sleepReset()
+			}
+		case <-shouldStop:
+			return
+		}
+	}
 }

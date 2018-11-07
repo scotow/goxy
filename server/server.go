@@ -143,7 +143,7 @@ func (s *Server) clientOutput(c *connection, id string, w http.ResponseWriter, r
 	defer c.lock.RUnlock()
 
 	if c.closing {
-		http.Error(w, "connection closed", http.StatusGone)
+		w.WriteHeader(http.StatusGone)
 		s.deleteConnection(id)
 		return
 	}
@@ -156,18 +156,17 @@ func (s *Server) clientFetch(c *connection, id string, w http.ResponseWriter, _ 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	io.Copy(w, &c.outputBuffer)
-
 	if c.closing {
-		http.Error(w, "connection closed", http.StatusGone)
+		w.WriteHeader(http.StatusGone)
 		s.deleteConnection(id)
-		return
 	}
+
+	io.Copy(w, &c.outputBuffer)
 }
 
 func (s *Server) clientClose(c *connection, id string, w http.ResponseWriter, r *http.Request) {
 	s.deleteConnection(id)
-	c.socketClosed <- true
+	c.clientClosed <- true
 
 	w.WriteHeader(http.StatusOK)
 	log.WithFields(log.Fields{

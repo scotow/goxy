@@ -19,14 +19,14 @@ type connection struct {
 	outputBuffer   bytes.Buffer
 	internalBuffer []byte
 
-	socketClosed chan bool
+	clientClosed chan bool
 	closing      bool
 }
 
 func newConnection(address string) (*connection, error) {
 	c := connection{}
 	c.internalBuffer = make([]byte, 1024)
-	c.socketClosed = make(chan bool)
+	c.clientClosed = make(chan bool)
 
 	addr, err := net.ResolveTCPAddr("tcp4", address)
 	if err != nil {
@@ -41,7 +41,21 @@ func newConnection(address string) (*connection, error) {
 	return &c, nil
 }
 
-func (c *connection) pipeSocketBuffer(channel chan<- error) {
+func (c *connection) start() {
+	socketClosed := make(chan error)
+	go c.pipeSocketBuffer(socketClosed)
+
+	select {
+	case <-c.clientClosed:
+		c.tcpConn.Close()
+	case <-socketClosed:
+		c.lock.Lock()
+		c.closing = true
+		c.lock.Unlock()
+	}
+}
+
+func (c *connection) pipeSocketBuffer(socketClosed chan<- error) {
 	for {
 		// Wait for some data to fill the TCP socket internal buffer.
 		n, err := c.tcpConn.Read(c.internalBuffer)
@@ -49,7 +63,7 @@ func (c *connection) pipeSocketBuffer(channel chan<- error) {
 		// Stop on error.
 		if err != nil {
 			c.tcpConn.Close()
-			channel <- err
+			socketClosed <- err
 			return
 		}
 
@@ -61,22 +75,8 @@ func (c *connection) pipeSocketBuffer(channel chan<- error) {
 		// Stop on error.
 		if err != nil {
 			c.tcpConn.Close()
-			channel <- err
+			socketClosed <- err
 			return
 		}
-	}
-}
-
-func (c *connection) start() {
-	pipeWorker := make(chan error)
-	go c.pipeSocketBuffer(pipeWorker)
-
-	select {
-	case <-c.socketClosed:
-		c.tcpConn.Close()
-	case <-pipeWorker:
-		c.lock.Lock()
-		c.closing = true
-		c.lock.Unlock()
 	}
 }
