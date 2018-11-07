@@ -16,7 +16,7 @@ type Client struct {
 	remoteAddr string
 }
 
-func NewClient(localAddr string, httpAddr, remoteAddr string) (*Client, error) {
+func NewClient(localAddr, httpAddr, remoteAddr string) (*Client, error) {
 	c := Client{}
 	c.localAddr = localAddr
 	c.httpAddr = httpAddr
