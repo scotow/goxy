@@ -139,6 +139,7 @@ func (s *Server) getConnection(r *http.Request) (*connection, string) {
 }
 
 func (s *Server) clientOutput(c *connection, id string, w http.ResponseWriter, r *http.Request) {
+	fmt.Println("clientOutput")
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -153,15 +154,32 @@ func (s *Server) clientOutput(c *connection, id string, w http.ResponseWriter, r
 }
 
 func (s *Server) clientFetch(c *connection, id string, w http.ResponseWriter, _ *http.Request) {
+	fmt.Println("clientFetch")
 	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	if c.closing {
 		w.WriteHeader(http.StatusGone)
 		s.deleteConnection(id)
 	}
 
-	io.Copy(w, &c.outputBuffer)
+	if c.outputBuffer.Len() > 0 {
+		io.Copy(w, &c.outputBuffer)
+	} else {
+		c.shouldNotify = true
+		c.lock.Unlock()
+
+		select {
+		case <-time.After(time.Second * 10):
+			c.lock.Lock()
+		case <-c.notifyRead:
+			c.lock.Lock()
+			io.Copy(w, &c.outputBuffer)
+		}
+
+		c.shouldNotify = false
+	}
+
+	c.lock.Unlock()
 }
 
 func (s *Server) clientClose(c *connection, id string, w http.ResponseWriter, r *http.Request) {

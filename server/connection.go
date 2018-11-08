@@ -19,6 +19,9 @@ type connection struct {
 	outputBuffer   bytes.Buffer
 	internalBuffer []byte
 
+	notifyRead   chan bool
+	shouldNotify bool
+
 	clientClosed chan bool
 	closing      bool
 }
@@ -26,6 +29,8 @@ type connection struct {
 func newConnection(address string) (*connection, error) {
 	c := connection{}
 	c.internalBuffer = make([]byte, 1024)
+
+	c.notifyRead = make(chan bool)
 	c.clientClosed = make(chan bool)
 
 	addr, err := net.ResolveTCPAddr("tcp4", address)
@@ -69,8 +74,13 @@ func (c *connection) pipeSocketBuffer(socketClosed chan<- error) {
 
 		// Copy data while locking the buffer.
 		c.lock.Lock()
+		shouldNotify := c.shouldNotify
 		_, err = c.outputBuffer.Write(c.internalBuffer[:n])
 		c.lock.Unlock()
+
+		if shouldNotify {
+			c.notifyRead <- true
+		}
 
 		// Stop on error.
 		if err != nil {
