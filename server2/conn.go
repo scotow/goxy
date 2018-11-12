@@ -30,6 +30,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	c.readC <- b
 	n = <-c.readNC
 
+	//fmt.Printf("Read: buffer size: %d. Read: %d.\n", len(b), n)
 	return
 }
 
@@ -46,6 +47,8 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	}
 
 	n = written
+
+	//fmt.Printf("Write: buffer size: %d. Written: %d.\n", len(b), n)
 	return
 }
 

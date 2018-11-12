@@ -30,6 +30,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	err = nil
 
 	// TODO: Check for error on read (should be EOF).
+	//fmt.Printf("Read: buffer size: %d. Read: %d.\n", len(b), n)
 	return
 }
 
@@ -46,7 +47,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	n = len(b)
 	// TODO: Check for end of file with custom HTTP status code.
 
-	fmt.Printf("Write: buffer size: %d. Written: %d.\n", len(b), n)
+	//fmt.Printf("Write: buffer size: %d. Written: %d.\n", len(b), n)
 	return
 }
 
