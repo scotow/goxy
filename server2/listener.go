@@ -137,7 +137,6 @@ func (l *Listener) handleClientFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Write N should not be less than len(b), only read should be restrained.
 	b := <-conn.writeC
 
 	if len(b) < max {

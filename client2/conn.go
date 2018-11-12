@@ -24,6 +24,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
+	defer resp.Body.Close()
 
 	n, _ = resp.Body.Read(b)
 	err = nil
@@ -35,13 +36,17 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 func (c *Conn) Write(b []byte) (n int, err error) {
 	httpAddr := fmt.Sprintf("http://%s/write/%s", c.remoteAddr.String(), c.id)
 
-	_, err = http.Post(httpAddr, "*/*", bytes.NewReader(b))
+	resp, err := http.Post(httpAddr, "*/*", bytes.NewReader(b))
 	if err != nil {
-		return 0, err
+		n = 0
+		return
 	}
+	defer resp.Body.Close()
 
 	n = len(b)
 	// TODO: Check for end of file with custom HTTP status code.
+
+	fmt.Printf("Write: buffer size: %d. Written: %d.\n", len(b), n)
 	return
 }
 
