@@ -10,7 +10,7 @@ import (
 
 var (
 	localTCP   = flag.String("l", ":2222", "local listening TCP address (host:port)")
-	remoteHTTP = flag.String("h", "localhost:8080", "remote Goxy server HTTP address (host:port)")
+	remoteHTTP = flag.String("r", "localhost:8080", "remote Goxy server HTTP address (host:port)")
 )
 
 func main() {

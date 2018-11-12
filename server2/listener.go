@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -42,8 +43,8 @@ type Listener struct {
 	connections map[string]*Conn
 }
 
-func (l *Listener) Start() error {
-	return l.server.ListenAndServe()
+func (l *Listener) Start() {
+	log.Panic(l.server.ListenAndServe())
 }
 
 func (l *Listener) getConnection(r *http.Request) (*Conn, string) {
@@ -136,6 +137,7 @@ func (l *Listener) handleClientFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Write N should not be less than len(b), only read should be restrained.
 	b := <-conn.writeC
 
 	if len(b) < max {

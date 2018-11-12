@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	localHTTP = flag.String("h", ":8080", "local HTTP address used by Goxy clients (address:port)")
+	localHTTP = flag.String("l", ":8080", "local HTTP address used by Goxy clients (address:port)")
 	remoteTCP = flag.String("r", "localhost:22", "remote TCP address (host:port)")
 )
 
@@ -40,6 +40,7 @@ func main() {
 		}).Error("Cannot start HTTP listener.")
 	}
 
+	// Will panic if listening fail.
 	go listener.Start()
 
 	log.WithFields(log.Fields{

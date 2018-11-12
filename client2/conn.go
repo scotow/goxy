@@ -29,20 +29,20 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	err = nil
 
 	// TODO: Check for error on read (should be EOF).
-
 	return
 }
 
-func (c *Conn) Write(b []byte) (int, error) {
+func (c *Conn) Write(b []byte) (n int, err error) {
 	httpAddr := fmt.Sprintf("http://%s/write/%s", c.remoteAddr.String(), c.id)
 
-	_, err := http.Post(httpAddr, "*/*", bytes.NewReader(b))
+	_, err = http.Post(httpAddr, "*/*", bytes.NewReader(b))
 	if err != nil {
 		return 0, err
 	}
 
+	n = len(b)
 	// TODO: Check for end of file with custom HTTP status code.
-	return len(b), nil
+	return
 }
 
 func (c *Conn) Close() error {
@@ -85,18 +85,3 @@ func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 	conn := Conn{string(id), remoteAddr}
 	return &conn, nil
 }
-
-//func (c *Conn) fetchData(dataFetched <-chan []byte) {
-//	ctx, _ := context.WithCancel(context.Background())
-//
-//	req, _ := http.NewRequest("GET", "http://localhost:8080", nil)
-//	req = req.WithContext(ctx)
-//
-//	req = req.WithContext(context.Background())
-//
-//	http.DefaultClient.Do(req)
-//}
-//
-//func (c *Conn) buffRead(stop <-chan interface{}) {
-//
-//}

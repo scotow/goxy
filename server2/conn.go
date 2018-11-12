@@ -34,9 +34,18 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	c.writeC <- b
-	n = <-c.writeNC
+	written := 0
 
+	for {
+		c.writeC <- b[written:]
+		written += <-c.writeNC
+
+		if written == len(b) {
+			break
+		}
+	}
+
+	n = written
 	return
 }
 
