@@ -51,7 +51,7 @@ func main() {
 			log.WithFields(log.Fields{
 				"address": *localTCP,
 				"error":   err,
-			}).Warning("Cannot accept TCP connection.")
+			}).Fatal("Cannot accept TCP connection.")
 		}
 
 		log.WithFields(log.Fields{
@@ -65,6 +65,7 @@ func main() {
 				"address": *remoteHTTP,
 				"error":   err,
 			}).Error("Cannot open Goxy connection.")
+			continue
 		}
 
 		log.WithFields(log.Fields{
