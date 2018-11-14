@@ -2,7 +2,6 @@ package client2
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -57,38 +56,17 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 	defer resp.Body.Close()
 
-	n, err = resp.Body.Read(b)
-	if err != nil && err != io.EOF {
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		fmt.Printf("Read: reading from body response error: %s\n", err.Error())
 		return
 	}
 
-	writtenServerS := resp.Header.Get("X-Will-Write")
-	if writtenServerS == "" {
-		fmt.Println()
-		fmt.Println("missing X-Will-Write header from response")
-		return
-	} else {
-		fmt.Printf("X-Will-Write: %s\n", writtenServerS)
-	}
-
-	writtenServer, err := strconv.Atoi(writtenServerS)
-	if err != nil {
-		fmt.Println("cannot parse X-Will-Write header")
-	} else {
-		if writtenServer != n {
-			fmt.Println("miss matching written/read length")
-			fmt.Println("http content length: ", resp.ContentLength)
-			fmt.Fprintf(c.logger, "Read: buffer size: %d. Read: %d.\n", len(b), n)
-
-			fmt.Println(base64.StdEncoding.EncodeToString(b[:n]))
-			//fmt.Println(string(b[:n]))
-			return
-		}
-	}
+	n = copy(b, content)
 
 	// TODO: Check for error on read (should be EOF).
 	fmt.Fprintf(c.logger, "Read: buffer size: %d. Read: %d.\n", len(b), n)
+
 	err = nil
 	return
 }
