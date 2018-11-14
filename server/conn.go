@@ -1,10 +1,7 @@
 package server
 
 import (
-	"fmt"
-	"io"
 	"net"
-	"os"
 	"strconv"
 	"time"
 )
@@ -14,18 +11,10 @@ func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
 	readC, readNC := make(chan []byte), make(chan int)
 	writeC, writeNC := make(chan []byte), make(chan int)
 
-	logFile, err := os.Create(fmt.Sprintf("goxy-server%s.log", id))
-	if err != nil {
-		return nil, err
-	}
-
-	logger := io.MultiWriter(os.Stdout, logFile)
-
 	return &Conn{
 		id,
 		localAddr, remoteAddr,
 		readC, readNC, writeC, writeNC,
-		logFile, logger,
 	}, nil
 }
 
@@ -39,16 +28,13 @@ type Conn struct {
 
 	writeC  chan []byte
 	writeNC chan int
-
-	logFile *os.File
-	logger  io.Writer
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
 	c.readC <- b
 	n = <-c.readNC
 
-	fmt.Fprintf(c.logger, "Read: buffer size: %d. Read: %d.\n", len(b), n)
+	//fmt.Fprintf(c.logger, "Read: buffer size: %d. Read: %d.\n", len(b), n)
 	return
 }
 
@@ -66,7 +52,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 
 	n = written
 
-	fmt.Fprintf(c.logger, "Write: buffer size: %d. Written: %d.\n", len(b), n)
+	//fmt.Fprintf(c.logger, "Write: buffer size: %d. Written: %d.\n", len(b), n)
 	return
 }
 
