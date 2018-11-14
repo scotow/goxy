@@ -13,6 +13,10 @@ var (
 	remoteHTTP = flag.String("r", "localhost:8080", "remote Goxy server HTTP address (host:port)")
 )
 
+func start() {
+
+}
+
 func main() {
 	flag.Parse()
 
