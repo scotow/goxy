@@ -12,14 +12,12 @@ func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
 	id := strconv.FormatInt(time.Now().UnixNano(), 10)
 	readC, readNC, readEC := make(chan []byte), make(chan int), make(chan error)
 	writeC, writeNC, writeEC := make(chan []byte), make(chan int), make(chan error)
-	closeC := make(chan struct{})
 
 	return &Conn{
 		id,
 		localAddr, remoteAddr, &common.State{},
 		readC, readNC, readEC,
 		writeC, writeNC, writeEC,
-		closeC,
 	}, nil
 }
 
@@ -36,16 +34,9 @@ type Conn struct {
 	writeC  chan []byte
 	writeNC chan int
 	writeEC chan error
-
-	closeC chan struct{}
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
-	if c.state.IsClosed() {
-		n, err = 0, io.ErrClosedPipe
-		return
-	}
-
 	c.readC <- b
 
 	n = <-c.readNC
@@ -64,6 +55,11 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	for {
 		c.writeC <- b[n:]
 		n += <-c.writeNC
+		err = <-c.writeEC
+
+		if err != nil {
+			break
+		}
 
 		if n == len(b) {
 			break
@@ -75,13 +71,6 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Close() error {
-	if c.state.IsClosed() {
-		return nil
-	}
-
-	c.state.SetClosed()
-	c.closeC <- struct{}{}
-
 	return nil
 }
 

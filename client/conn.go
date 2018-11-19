@@ -34,7 +34,6 @@ func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 	}
 
 	conn := Conn{string(id), remoteAddr, &common.State{}, new(http.Client)}
-	go conn.WaitForRemoteClose()
 
 	return &conn, nil
 }
@@ -109,19 +108,6 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Close() error {
-	if c.state.IsClosed() {
-		return nil
-	}
-
-	c.state.SetClosed()
-
-	httpAddr := fmt.Sprintf("http://%s/close/%s", c.remoteAddr.String(), c.id)
-
-	resp, err := http.Get(httpAddr)
-	if err != nil {
-		return
-	}
-
 	return nil
 }
 

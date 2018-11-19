@@ -19,12 +19,9 @@ func NewListener(localAddr *net.TCPAddr) (*Listener, error) {
 
 	r := mux.NewRouter()
 
-	//r.HandleFunc("/status", l.handleStatus).Methods("GET")
 	r.HandleFunc("/create", l.handleAccept).Methods("GET", "POST")
 	r.HandleFunc("/write/{id}", l.handleClientOutput).Methods("POST")
 	r.HandleFunc("/read/{id}", l.handleClientFetch).Methods("POST")
-	r.HandleFunc("/{id}/close", l.handl).Methods("GET")
-	r.HandleFunc("/{id}/wait", l.handleCloseWaiting).Methods("GET")
 
 	l.server = &http.Server{}
 	l.server.Addr = localAddr.String()
@@ -172,18 +169,5 @@ func (l *Listener) handleClientFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	conn.writeNC <- n
-}
-
-func (l *Listener) handleClose(w http.ResponseWriter, r *http.Request) {
-	conn, _ := l.getConnection(r)
-	conn.state.SetClosed()
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (l *Listener) handleCloseWaiting(w http.ResponseWriter, r *http.Request) {
-	conn, _ := l.getConnection(r)
-	<-conn.closeC
-
-	w.WriteHeader(http.StatusOK)
+	conn.writeEC <- err
 }
