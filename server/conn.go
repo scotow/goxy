@@ -2,7 +2,6 @@ package server
 
 import (
 	"github.com/scotow/goxy/common"
-	"io"
 	"net"
 	"strconv"
 	"time"
@@ -47,11 +46,6 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	if c.state.IsClosed() {
-		n, err = 0, io.ErrClosedPipe
-		return
-	}
-
 	for {
 		c.writeC <- b[n:]
 		n += <-c.writeNC

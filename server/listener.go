@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/scotow/goxy/common"
 	"io"
 	"io/ioutil"
 	"log"
@@ -111,19 +110,13 @@ func (l *Listener) handleClientOutput(w http.ResponseWriter, r *http.Request) {
 
 		conn.readNC <- n
 
+		if err == io.EOF {
+			conn.readEC <- nil
+			break
+		}
+
 		if err != nil {
-			// Body fully consumed.
-			if err == io.EOF {
-				// If we receive the magic flag from the client.
-				if r.Header.Get("Accept-Language") == common.CloseHeaderLanguage {
-					conn.readEC <- io.EOF
-				} else {
-					conn.readEC <- nil
-				}
-				// A read error occurred.
-			} else {
-				conn.readEC <- err
-			}
+			conn.readEC <- err
 			break
 		}
 
