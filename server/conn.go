@@ -1,30 +1,27 @@
 package server
 
 import (
-	"github.com/scotow/goxy/common"
+	. "github.com/scotow/goxy/common"
 	"net"
-	"strconv"
 	"time"
 )
 
-func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
-	id := strconv.FormatInt(time.Now().UnixNano(), 10)
+func newConn(id *Id, localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
 	readC, readNC, readEC := make(chan []byte), make(chan int), make(chan error)
 	writeC, writeNC, writeEC := make(chan []byte), make(chan int), make(chan error)
 
 	return &Conn{
 		id,
-		localAddr, remoteAddr, &common.State{},
+		localAddr, remoteAddr,
 		readC, readNC, readEC,
 		writeC, writeNC, writeEC,
 	}, nil
 }
 
 type Conn struct {
-	id         string
+	id         *Id
 	localAddr  *net.TCPAddr
 	remoteAddr *net.TCPAddr
-	state      *common.State
 
 	readC  chan []byte
 	readNC chan int

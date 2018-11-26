@@ -10,28 +10,35 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	. "github.com/scotow/goxy/common"
 )
 
 func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
-	httpAddr := fmt.Sprintf("http://%s/create", remoteAddr.String())
+	httpAddr := fmt.Sprintf("http://%s/", remoteAddr.String())
 
 	resp, err := http.Get(httpAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := ioutil.ReadAll(resp.Body)
+	token, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	conn := Conn{string(id), remoteAddr}
+	id, err := NewIdFromToken(string(token))
+	if err != nil {
+		return nil, err
+	}
+
+	conn := Conn{id, remoteAddr}
 
 	return &conn, nil
 }
 
 type Conn struct {
-	id         string
+	id         *Id
 	remoteAddr *net.TCPAddr
 }
 

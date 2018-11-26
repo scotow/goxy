@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	. "github.com/scotow/goxy/common"
 	"io"
 	"io/ioutil"
 	"log"
@@ -12,13 +14,17 @@ import (
 	"sync"
 )
 
+var (
+	ErrWriteLengthMismatch = errors.New("write and expected right mismatched")
+)
+
 func NewListener(localAddr *net.TCPAddr) (*Listener, error) {
 	l := Listener{}
 	l.localAddr = localAddr
 
 	r := mux.NewRouter()
 
-	r.HandleFunc("/create", l.handleAccept).Methods("GET", "POST")
+	r.HandleFunc("/", l.handleAccept).Methods("GET", "POST")
 	r.HandleFunc("/write/{id}", l.handleClientOutput).Methods("POST")
 	r.HandleFunc("/read/{id}", l.handleClientFetch).Methods("POST")
 
@@ -79,7 +85,28 @@ func (l *Listener) handleAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := newConn(l.localAddr, remoteAddr)
+	var id *Id
+	attempts := 0
+	l.cLock.RLock()
+
+	for {
+		id = NewRandomId()
+
+		if l.connections[id.Token()] == nil {
+			break
+		}
+
+		attempts += 1
+		if attempts == 20 {
+			l.cLock.RUnlock()
+			http.Error(w, "too many connections", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	l.cLock.RUnlock()
+
+	conn, err := newConn(id, l.localAddr, remoteAddr)
 	if err != nil {
 		errCode := http.StatusInternalServerError
 		http.Error(w, http.StatusText(errCode), errCode)
@@ -87,11 +114,11 @@ func (l *Listener) handleAccept(w http.ResponseWriter, r *http.Request) {
 	}
 
 	l.cLock.Lock()
-	l.connections[conn.id] = conn
+	l.connections[id.Token()] = conn
 	l.cLock.Unlock()
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, conn.id)
+	fmt.Fprint(w, id.Token())
 
 	l.acceptC <- conn
 }
@@ -157,8 +184,12 @@ func (l *Listener) handleClientFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n, err := w.Write(b[:max])
-	if err != nil || n != max {
+	if err != nil {
 		fmt.Println("error while writing content to client read request")
+	}
+
+	if n != max && err == nil {
+		err = ErrWriteLengthMismatch
 	}
 
 	conn.writeNC <- n
