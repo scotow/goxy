@@ -6,16 +6,14 @@ import (
 	"time"
 )
 
-func newConn(id *Id, localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
-	readC, readNC, readEC := make(chan []byte), make(chan int), make(chan error)
-	writeC, writeNC, writeEC := make(chan []byte), make(chan int), make(chan error)
+func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
+	conn := new(Conn)
 
-	return &Conn{
-		id,
-		localAddr, remoteAddr,
-		readC, readNC, readEC,
-		writeC, writeNC, writeEC,
-	}, nil
+	conn.localAddr, conn.remoteAddr = localAddr, remoteAddr
+	conn.readC, conn.readNC, conn.readEC = make(chan []byte), make(chan int), make(chan error)
+	conn.writeC, conn.writeNC, conn.writeEC = make(chan []byte), make(chan int), make(chan error)
+
+	return conn, nil
 }
 
 type Conn struct {

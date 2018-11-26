@@ -21,15 +21,15 @@ var (
 		{"redirect", "dict"},          // C
 		{"video", "view", "twitter"},  // E
 		{"info", "buff"},              // F
-		{"image", "homepage", "page"}, //G
-		{"grid", "static", "historic", "pubic", "login"}, // I
-		{"print", "loading"},                             // N
-		{"game", "home"},                                 // M
-		{"information", "amazon", "facebook"},            // O
-		{"card", "return", "picture", "forward"},         // R
-		{"reverse", "adjust"},                            // S
-		{"data", "date", "site", "state", "path"},        // T
-		{"catalogue", "previous"},                        // U
+		{"image", "homepage", "page"}, // G
+		{"grid", "static", "historic", "pubic", "login"},           // I
+		{"print", "loading"},                                       // N
+		{"game", "home"},                                           // M
+		{"information", "amazon", "facebook"},                      // O
+		{"card", "return", "picture", "forward"},                   // R
+		{"reverse", "adjust"},                                      // S
+		{"data", "date", "site", "state", "path", "accessibility"}, // T
+		{"catalogue", "previous"},                                  // U
 	}
 )
 

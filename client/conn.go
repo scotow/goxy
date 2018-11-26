@@ -2,16 +2,20 @@ package client
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	. "github.com/scotow/goxy/common"
+)
+
+const (
+	maximumSizeWriteGet = 128
+	defaultUserAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 )
 
 func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
@@ -42,10 +46,12 @@ type Conn struct {
 	remoteAddr *net.TCPAddr
 }
 
-func (c *Conn) Read(b []byte) (n int, err error) {
-	httpAddr := fmt.Sprintf("http://%s/read/%s", c.remoteAddr.String(), c.id)
+func (c *Conn) buildHttpUrl() string {
+	return fmt.Sprintf("http://%s/%s", c.remoteAddr.String(), c.id.RandomPath())
+}
 
-	resp, err := http.Post(httpAddr, "*/*", strings.NewReader(strconv.Itoa(len(b))))
+func (c *Conn) Read(b []byte) (n int, err error) {
+	resp, err := http.Get(c.buildHttpUrl())
 	if err != nil {
 		fmt.Println("HTTP read POST request", err.Error())
 		return
@@ -73,9 +79,28 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	httpAddr := fmt.Sprintf("http://%s/write/%s", c.remoteAddr.String(), c.id)
+	req := new(http.Request)
 
-	resp, err := http.Post(httpAddr, "*/*", bytes.NewReader(b))
+	if len(b) < maximumSizeWriteGet {
+		req, err = http.NewRequest("GET", c.buildHttpUrl(), nil)
+		if err != nil {
+			n = 0
+			return
+		}
+		req.Header.Set("Authorization", base64.StdEncoding.EncodeToString(b))
+	} else {
+		req, err = http.NewRequest("POST", c.buildHttpUrl(), bytes.NewReader(b))
+		if err != nil {
+			n = 0
+			return
+		}
+	}
+
+	req.Header.Set("User-Agent", defaultUserAgent)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
 	if err != nil {
 		n = 0
 		return

@@ -1,39 +1,33 @@
 package server
 
 import (
-	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	. "github.com/scotow/goxy/common"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-	"strconv"
-	"sync"
 )
 
 var (
-	ErrWriteLengthMismatch = errors.New("write and expected right mismatched")
+//ErrWriteLengthMismatch = errors.New("write and expected right mismatched")
 )
 
 func NewListener(localAddr *net.TCPAddr) (*Listener, error) {
 	l := Listener{}
 	l.localAddr = localAddr
 
-	r := mux.NewRouter()
+	l.mapping = newConnMapping()
 
-	r.HandleFunc("/", l.handleAccept).Methods("GET", "POST")
-	r.HandleFunc("/write/{id}", l.handleClientOutput).Methods("POST")
-	r.HandleFunc("/read/{id}", l.handleClientFetch).Methods("POST")
+	handler := newHandler(l.mapping)
+	handler.creationH = l.handleAccept
+	handler.readH = l.handleClientFetch
+	handler.writeH = l.handleClientOutput
 
 	l.server = &http.Server{}
 	l.server.Addr = localAddr.String()
-	l.server.Handler = r
+	l.server.Handler = handler
 
 	l.acceptC = make(chan *Conn)
-	l.connections = make(map[string]*Conn)
 
 	return &l, nil
 }
@@ -41,24 +35,13 @@ func NewListener(localAddr *net.TCPAddr) (*Listener, error) {
 type Listener struct {
 	localAddr *net.TCPAddr
 
+	mapping *connMapping
 	server  *http.Server
 	acceptC chan *Conn
-
-	cLock       sync.RWMutex
-	connections map[string]*Conn
 }
 
 func (l *Listener) Start() {
 	log.Panic(l.server.ListenAndServe())
-}
-
-func (l *Listener) getConnection(r *http.Request) (*Conn, string) {
-	id := mux.Vars(r)["id"]
-
-	l.cLock.RLock()
-	defer l.cLock.RUnlock()
-
-	return l.connections[id], id
 }
 
 // Listener interface
@@ -77,63 +60,35 @@ func (l *Listener) Addr() net.Addr {
 
 // HTTP handlers
 
-func (l *Listener) handleAccept(w http.ResponseWriter, r *http.Request) {
-	remoteAddr, err := net.ResolveTCPAddr("tcp", r.RemoteAddr)
+func (l *Listener) handleAccept(w http.ResponseWriter, rAddr string) {
+	remoteAddr, err := net.ResolveTCPAddr("tcp", rAddr)
 
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	var id *Id
-	attempts := 0
-	l.cLock.RLock()
-
-	for {
-		id = NewRandomId()
-
-		if l.connections[id.Token()] == nil {
-			break
-		}
-
-		attempts += 1
-		if attempts == 20 {
-			l.cLock.RUnlock()
-			http.Error(w, "too many connections", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	l.cLock.RUnlock()
-
-	conn, err := newConn(id, l.localAddr, remoteAddr)
+	conn, err := newConn(l.localAddr, remoteAddr)
 	if err != nil {
-		errCode := http.StatusInternalServerError
-		http.Error(w, http.StatusText(errCode), errCode)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	l.cLock.Lock()
-	l.connections[id.Token()] = conn
-	l.cLock.Unlock()
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, id.Token())
+	err = l.mapping.addConn(conn)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	l.acceptC <- conn
+
+	fmt.Fprintf(w, conn.id.Token())
 }
 
-func (l *Listener) handleClientOutput(w http.ResponseWriter, r *http.Request) {
-	conn, _ := l.getConnection(r)
-
-	if conn == nil {
-		http.Error(w, "cannot find connection with id", http.StatusBadRequest)
-		return
-	}
-
+func (l *Listener) handleClientOutput(conn *Conn, r io.Reader) {
 	for {
 		b := <-conn.readC
-		n, err := r.Body.Read(b)
+		n, err := r.Read(b)
 
 		conn.readNC <- n
 
@@ -147,49 +102,16 @@ func (l *Listener) handleClientOutput(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Didn't finish to read the response body.
 		conn.readEC <- nil
 	}
 }
 
-func (l *Listener) handleClientFetch(w http.ResponseWriter, r *http.Request) {
-	conn, _ := l.getConnection(r)
-
-	if conn == nil {
-		http.Error(w, "cannot find connection with id", http.StatusBadRequest)
-		fmt.Println("cannot find connection with id")
-		return
-	}
-
-	data, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Println("cannot read fetch request body")
-		return
-	}
-
-	clientCapacity, err := strconv.Atoi(string(data))
-	if err != nil {
-		fmt.Println("cannot parse  fetch request buffer size")
-		return
-	}
-
+func (l *Listener) handleClientFetch(conn *Conn, w http.ResponseWriter) {
 	b := <-conn.writeC
 
-	var max int
-	if clientCapacity < len(b) {
-		max = clientCapacity
-		fmt.Println("fetch: asked is too big, sending what we got")
-	} else {
-		max = len(b)
-	}
-
-	n, err := w.Write(b[:max])
+	n, err := w.Write(b)
 	if err != nil {
 		fmt.Println("error while writing content to client read request")
-	}
-
-	if n != max && err == nil {
-		err = ErrWriteLengthMismatch
 	}
 
 	conn.writeNC <- n
