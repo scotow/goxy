@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	goxy "github.com/scotow/goxy/client"
+	"github.com/scotow/goxy/common"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
@@ -72,7 +73,8 @@ func main() {
 			"address": *remoteHTTP,
 		}).Info("Goxy connection created.")
 
-		go io.Copy(tcpConn, goxyConn)
-		go io.Copy(goxyConn, tcpConn)
+		buff1, buff2 := make([]byte, common.RecommendedBufferSize), make([]byte, common.RecommendedBufferSize)
+		go io.CopyBuffer(tcpConn, goxyConn, buff1)
+		go io.CopyBuffer(goxyConn, tcpConn, buff2)
 	}
 }
