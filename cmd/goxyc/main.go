@@ -2,21 +2,79 @@ package main
 
 import (
 	"flag"
-	"time"
-
 	goxy "github.com/scotow/goxy/client"
+	"github.com/scotow/goxy/common"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"net"
 )
 
 var (
 	localTCP   = flag.String("l", ":2222", "local listening TCP address (host:port)")
-	remoteHTTP = flag.String("h", "localhost:8080", "remote Goxy server HTTP address (host:port)")
-	remoteTCP  = flag.String("r", "localhost:22", "remote TCP address (host:port)")
+	remoteHTTP = flag.String("r", "localhost:8080", "remote Goxy server HTTP address (host:port)")
 )
 
 func main() {
 	flag.Parse()
 
-	client, _ := goxy.NewClient(*localTCP, *remoteHTTP, *remoteTCP)
-	client.WaitUntilServerUp(time.Second)
-	client.Start()
+	localTCPAddr, err := net.ResolveTCPAddr("tcp", *localTCP)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"address": *localTCP,
+			"error":   err,
+		}).Error("Invalid listening address.")
+	}
+
+	remoteHTTPAddr, err := net.ResolveTCPAddr("tcp", *remoteHTTP)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"address": *remoteHTTP,
+			"error":   err,
+		}).Error("Invalid remote HTTP address.")
+	}
+
+	listener, err := net.ListenTCP("tcp", localTCPAddr)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"address": *localTCP,
+			"error":   err,
+		}).Error("Cannot start TCP listener.")
+	}
+
+	log.WithFields(log.Fields{
+		"local":  *localTCP,
+		"remote": *remoteHTTP,
+	}).Info("Goxy client started.")
+
+	for {
+		tcpConn, err := listener.Accept()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"address": *localTCP,
+				"error":   err,
+			}).Fatal("Cannot accept TCP connection.")
+		}
+
+		log.WithFields(log.Fields{
+			"local":  tcpConn.LocalAddr(),
+			"remote": tcpConn.RemoteAddr(),
+		}).Info("TCP connection accepted.")
+
+		goxyConn, err := goxy.Dial(remoteHTTPAddr)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"address": *remoteHTTP,
+				"error":   err,
+			}).Error("Cannot open Goxy connection.")
+			continue
+		}
+
+		log.WithFields(log.Fields{
+			"address": *remoteHTTP,
+		}).Info("Goxy connection created.")
+
+		buff1, buff2 := make([]byte, common.RecommendedBufferSize), make([]byte, common.RecommendedBufferSize)
+		go io.CopyBuffer(tcpConn, goxyConn, buff1)
+		go io.CopyBuffer(goxyConn, tcpConn, buff2)
+	}
 }
