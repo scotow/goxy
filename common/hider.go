@@ -22,17 +22,6 @@ var (
 	ErrInvalidExtension = errors.New("invalid path extension")
 )
 
-//type hideFunc func([]byte) []byte
-
-/*func HideContent(data []byte) ([]byte, string, string, error) {
-	hider, err := RandomHider()
-	if err != nil {
-		return data, "", "", err
-	}
-
-	return hider.f(data), hider.mime, hider.suffix, nil
-}*/
-
 func RandomHider() (*Hider, error) {
 	if len(hiders) == 0 {
 		return nil, ErrNoHiderAvailable

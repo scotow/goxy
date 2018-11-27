@@ -87,7 +87,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		conn.newWriteToken()
 		w.Header().Set("X-Referer", conn.writeToken)
 
-		h.writeH(conn, r.Body)
+		h.writeH(conn, base64.NewDecoder(base64.StdEncoding, r.Body))
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte("The page you asked was renamed."))

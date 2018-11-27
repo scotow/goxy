@@ -1,13 +1,13 @@
 package client
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	. "github.com/scotow/goxy/common"
@@ -94,7 +94,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 
 	c.readToken = resp.Header.Get("X-Referer")
 
-	reader := hider.GetExtractor(resp.Body)
+	reader := base64.NewDecoder(base64.StdEncoding, hider.GetExtractor(resp.Body))
 
 	for {
 		read, er := reader.Read(b[n:])
@@ -133,7 +133,9 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		}
 		req.Header.Set("Authorization", base64.StdEncoding.EncodeToString(b))
 	} else {
-		req, err = http.NewRequest("POST", c.buildHttpUrlWithHider(hider), bytes.NewReader(b))
+		encoded := base64.StdEncoding.EncodeToString(b)
+
+		req, err = http.NewRequest("POST", c.buildHttpUrlWithHider(hider), strings.NewReader(encoded))
 		if err != nil {
 			n = 0
 			return

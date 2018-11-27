@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/scotow/goxy/common"
 	"io"
@@ -111,7 +112,7 @@ func (l *Listener) handleClientOutput(conn *Conn, r io.Reader) {
 func (l *Listener) handleClientFetch(conn *Conn, w http.ResponseWriter, hider *common.Hider) {
 	b := <-conn.writeC
 
-	n, err := w.Write(hider.HideData(b))
+	n, err := w.Write(hider.HideData([]byte(base64.StdEncoding.EncodeToString(b))))
 	if err != nil {
 		fmt.Println("error while writing content to client read request")
 	}
