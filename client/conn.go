@@ -21,7 +21,14 @@ const (
 func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 	httpAddr := fmt.Sprintf("http://%s/", remoteAddr.String())
 
-	resp, err := http.Get(httpAddr)
+	req, err := http.NewRequest("GET", httpAddr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", defaultUserAgent)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +58,17 @@ func (c *Conn) buildHttpUrl() string {
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
-	resp, err := http.Get(c.buildHttpUrl())
+	req, err := http.NewRequest("GET", c.buildHttpUrl(), nil)
 	if err != nil {
-		fmt.Println("HTTP read POST request", err.Error())
+		n = 0
+		return
+	}
+
+	req.Header.Set("User-Agent", defaultUserAgent)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		n = 0
 		return
 	}
 	defer resp.Body.Close()
