@@ -17,19 +17,28 @@ var (
 
 var (
 	words = [][]string{
-		{"load"},                      // A
-		{"redirect", "dict"},          // C
-		{"video", "view", "twitter"},  // E
-		{"info", "buff"},              // F
-		{"image", "homepage", "page"}, // G
-		{"grid", "static", "historic", "pubic", "login"},           // I
-		{"print", "loading"},                                       // N
-		{"game", "home"},                                           // M
-		{"information", "amazon", "facebook"},                      // O
-		{"card", "return", "picture", "forward"},                   // R
-		{"reverse", "adjust"},                                      // S
-		{"data", "date", "site", "state", "path", "accessibility"}, // T
-		{"catalogue", "previous"},                                  // U
+		/* A */ {"general", "program", "great", "international", "local", "national", "special", "today", "american", "total", "legal", "areas", "format"},
+		/* B */ {"subscribe", "maybe", "clubs", "adobe", "nearby", "describe", "doubt", "toshiba", "unsubscribe", "globe"},
+		/* C */ {"search", "which", "contact", "click", "service", "price", "product", "policy", "privacy", "research"},
+		/* D */ {"guide", "include", "provide", "canada", "study", "needs", "cards", "friends", "trade", "already"},
+		/* E */ {"other", "services", "system", "number", "after", "video", "review", "order", "under", "games"},
+		/* F */ {"staff", "microsoft", "stuff", "identify", "draft", "aircraft", "wildlife", "notify", "modify", "shift"},
+		/* G */ {"message", "through", "design", "technology", "change", "image", "college", "large", "things", "language", "homepage"},
+		/* H */ {"copyright", "right", "night", "light", "might", "months", "weight", "thought", "photography", "brought"},
+		/* I */ {"their", "email", "music", "public", "within", "media", "visit", "credit", "movie", "again", "login", "static", "historic"},
+		/* K */ {"books", "links", "works", "thanks", "weeks", "networks", "trademarks", "looks", "alaska", "banks"},
+		/* L */ {"would", "people", "world", "should", "available", "could", "details", "hotels", "family", "while"},
+		/* M */ {"items", "terms", "systems", "forums", "programs", "problems", "become", "welcome", "income", "volume"},
+		/* N */ {"online", "company", "management", "development", "using", "phone", "shipping", "being", "found", "following", "print", "loading"},
+		/* O */ {"information", "school", "education", "version", "section", "control", "location", "description", "author", "photos", "amazon"},
+		/* P */ {"groups", "europe", "happy", "ships", "except", "accept", "perhaps", "therapy", "steps", "shops"},
+		/* R */ {"there", "support", "software", "where", "years", "january", "store", "report", "before", "members", "return", "picture", "forward"},
+		/* S */ {"business", "first", "these", "please", "because", "those", "address", "house", "access", "class", "reverse", "adjust"},
+		/* T */ {"state", "health", "products", "rights", "university", "comments", "results", "community", "website", "south", "accessibility"},
+		/* U */ {"about", "group", "forum", "without", "previous", "value", "status", "issue", "various", "linux", "catalogue"},
+		/* V */ {"above", "archive", "drive", "receive", "active", "effective", "believe", "executive", "leave", "improve"},
+		/* W */ {"reviews", "windows", "known", "shows", "views", "shown", "brown", "allows", "unknown", "follows"},
+		/* Y */ {"always", "holidays", "plays", "displays", "surveys", "attorneys", "vinyl", "essays", "tokyo", "kenya"},
 	}
 )
 
