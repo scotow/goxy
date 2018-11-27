@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/scotow/goxy/common"
 	"io"
 	"log"
 	"net"
@@ -82,6 +83,7 @@ func (l *Listener) handleAccept(w http.ResponseWriter, rAddr string) {
 
 	l.acceptC <- conn
 
+	w.Header().Set("X-Referer", fmt.Sprintf("%s %s", conn.readToken, conn.writeToken))
 	fmt.Fprintf(w, conn.id.Token())
 }
 
@@ -106,14 +108,18 @@ func (l *Listener) handleClientOutput(conn *Conn, r io.Reader) {
 	}
 }
 
-func (l *Listener) handleClientFetch(conn *Conn, w http.ResponseWriter) {
+func (l *Listener) handleClientFetch(conn *Conn, w http.ResponseWriter, hider *common.Hider) {
 	b := <-conn.writeC
 
-	n, err := w.Write(b)
+	n, err := w.Write(hider.HideData(b))
 	if err != nil {
 		fmt.Println("error while writing content to client read request")
 	}
 
-	conn.writeNC <- n
+	if n == len(b) {
+		fmt.Println("invalid hidden content length")
+	}
+
+	conn.writeNC <- len(b)
 	conn.writeEC <- err
 }

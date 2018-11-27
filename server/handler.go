@@ -14,7 +14,7 @@ var (
 )
 
 type clientCreationHandler func(http.ResponseWriter, string)
-type clientReadHandler func(*Conn, http.ResponseWriter)
+type clientReadHandler func(*Conn, http.ResponseWriter, *common.Hider)
 type clientWriteHandler func(*Conn, io.Reader)
 
 func newHandler(mapping *connMapping) *handler {
@@ -53,7 +53,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if conn.writeToken != r.Header.Get("Referer") {
+			w.Write([]byte("The page you asked was deleted."))
+			return
+		}
+
+		conn.newWriteToken()
+		w.Header().Set("X-Referer", conn.writeToken)
+
 		h.writeH(conn, base64.NewDecoder(base64.StdEncoding, strings.NewReader(r.Header.Get("Authorization"))))
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("The page you asked was deleted."))
 		return
 	}
 
@@ -68,7 +79,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if conn.writeToken != r.Header.Get("Referer") {
+			w.Write([]byte("The page you asked was deleted."))
+			return
+		}
+
+		conn.newWriteToken()
+		w.Header().Set("X-Referer", conn.writeToken)
+
 		h.writeH(conn, r.Body)
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("The page you asked was renamed."))
 		return
 	}
 
@@ -83,7 +105,23 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.readH(conn, w)
+		hider, err := common.HiderFromPath(r.RequestURI)
+		if err != nil {
+			w.Write([]byte("The page you asked was deleted."))
+			//http.Error(w, http.StatusText(http.StatusForbidden), http.StatusInternalServerError)
+			return
+		}
+
+		if conn.readToken != r.Header.Get("Referer") {
+			w.Write([]byte("The page you asked was deleted."))
+			return
+		}
+
+		conn.newReadToken()
+		w.Header().Set("X-Referer", conn.readToken)
+
+		w.Header().Set("Content-Type", hider.Mime)
+		h.readH(conn, w, hider)
 		return
 	}
 
@@ -96,8 +134,10 @@ func (h *handler) findConnection(w http.ResponseWriter, r *http.Request) (conn *
 		return
 	}
 
-	token := common.TokenFromPath(r.RequestURI[1:])
+	parts := strings.SplitN(r.RequestURI[1:], ".", 2)
+	token := common.TokenFromPath(parts[0])
 	conn, err := h.connM.getConn(token)
+
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return

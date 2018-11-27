@@ -27,6 +27,7 @@ func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 	}
 
 	req.Header.Set("User-Agent", defaultUserAgent)
+	req.Header.Set("Cache-Control", "no-cache")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -43,7 +44,10 @@ func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 		return nil, err
 	}
 
-	conn := Conn{id, remoteAddr}
+	var readToken, writeToken string
+	fmt.Sscanf(resp.Header.Get("X-Referer"), "%s %s", &readToken, &writeToken)
+
+	conn := Conn{id, remoteAddr, readToken, writeToken}
 
 	return &conn, nil
 }
@@ -51,20 +55,35 @@ func Dial(remoteAddr *net.TCPAddr) (*Conn, error) {
 type Conn struct {
 	id         *Id
 	remoteAddr *net.TCPAddr
+
+	readToken  string
+	writeToken string
 }
 
 func (c *Conn) buildHttpUrl() string {
 	return fmt.Sprintf("http://%s/%s", c.remoteAddr.String(), c.id.RandomPath())
 }
 
+func (c *Conn) buildHttpUrlWithHider(hider *Hider) string {
+	return fmt.Sprintf("http://%s/%s.%s", c.remoteAddr.String(), c.id.RandomPath(), hider.Extension)
+}
+
 func (c *Conn) Read(b []byte) (n int, err error) {
-	req, err := http.NewRequest("GET", c.buildHttpUrl(), nil)
+	hider, err := RandomHider()
+	if err != nil {
+		n = 0
+		return
+	}
+
+	req, err := http.NewRequest("GET", c.buildHttpUrlWithHider(hider), nil)
 	if err != nil {
 		n = 0
 		return
 	}
 
 	req.Header.Set("User-Agent", defaultUserAgent)
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Referer", c.readToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -73,8 +92,12 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 	defer resp.Body.Close()
 
+	c.readToken = resp.Header.Get("X-Referer")
+
+	reader := hider.GetExtractor(resp.Body)
+
 	for {
-		read, er := resp.Body.Read(b[n:])
+		read, er := reader.Read(b[n:])
 		n += read
 		err = er
 
@@ -94,17 +117,23 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
+	hider, err := RandomHider()
+	if err != nil {
+		n = 0
+		return
+	}
+
 	req := new(http.Request)
 
 	if len(b) < maximumSizeWriteGet {
-		req, err = http.NewRequest("GET", c.buildHttpUrl(), nil)
+		req, err = http.NewRequest("GET", c.buildHttpUrlWithHider(hider), nil)
 		if err != nil {
 			n = 0
 			return
 		}
 		req.Header.Set("Authorization", base64.StdEncoding.EncodeToString(b))
 	} else {
-		req, err = http.NewRequest("POST", c.buildHttpUrl(), bytes.NewReader(b))
+		req, err = http.NewRequest("POST", c.buildHttpUrlWithHider(hider), bytes.NewReader(b))
 		if err != nil {
 			n = 0
 			return
@@ -112,15 +141,18 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	}
 
 	req.Header.Set("User-Agent", defaultUserAgent)
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Referer", c.writeToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
-
 	if err != nil {
 		n = 0
 		return
 	}
 	defer resp.Body.Close()
+
+	c.writeToken = resp.Header.Get("X-Referer")
 
 	n = len(b)
 

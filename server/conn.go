@@ -2,9 +2,15 @@ package server
 
 import (
 	. "github.com/scotow/goxy/common"
+	"math/rand"
 	"net"
+	"strconv"
 	"time"
 )
+
+func randomReadWriteToken() string {
+	return strconv.Itoa(int(rand.Uint32()))
+}
 
 func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
 	conn := new(Conn)
@@ -12,6 +18,9 @@ func newConn(localAddr, remoteAddr *net.TCPAddr) (*Conn, error) {
 	conn.localAddr, conn.remoteAddr = localAddr, remoteAddr
 	conn.readC, conn.readNC, conn.readEC = make(chan []byte), make(chan int), make(chan error)
 	conn.writeC, conn.writeNC, conn.writeEC = make(chan []byte), make(chan int), make(chan error)
+
+	conn.newReadToken()
+	conn.newWriteToken()
 
 	return conn, nil
 }
@@ -28,6 +37,17 @@ type Conn struct {
 	writeC  chan []byte
 	writeNC chan int
 	writeEC chan error
+
+	readToken  string
+	writeToken string
+}
+
+func (c *Conn) newReadToken() {
+	c.readToken = randomReadWriteToken()
+}
+
+func (c *Conn) newWriteToken() {
+	c.writeToken = randomReadWriteToken()
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
