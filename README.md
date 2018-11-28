@@ -95,8 +95,9 @@ Be sure to have set your GOPATH variable.
 
 ```sh
 mkdir -p $GOPATH/src/github.com/scotow
-cd $GOPATH/src/github.com/scotow/goxy
+cp . $GOPATH/src/github.com/scotow/
 ```
+
 
 ### Running the server
 
@@ -117,7 +118,21 @@ go run $GOPATH/src/github.com/scotow/goxy/cmd/goxyc/main.go
 Use the `-h` options to change the default parameters
 
 
-### Examples
+### SSH examples
+
+Simple SSH connections
+
+```sh
+ssh -p 2222 localhost
+```
+
+SSH Reverse tunnel option can be used to connect from home to the company's computer:
+
+```sh
+ssh -p 2222 -R 2222:localhost:22 my.home.com
+```
+
+Then while at home:
 
 ```sh
 ssh -p 2222 localhost
