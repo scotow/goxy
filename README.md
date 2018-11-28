@@ -95,7 +95,7 @@ Be sure to have set your GOPATH variable.
 
 ```sh
 mkdir -p $GOPATH/src/github.com/scotow
-cp . $GOPATH/src/github.com/scotow/
+cp goxy $GOPATH/src/github.com/scotow/
 ```
 
 
