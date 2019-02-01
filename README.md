@@ -1,6 +1,6 @@
 # goxy - A TCP tunnel over HTTP
 
-### ⚠️ This project was made for an university (TIIR - Lille) coursework and should not be considered has a serious project, nor used for production. ⚠️
+### ⚠️ This project was made for an university (TIIR - Lille) coursework and should not be considered has a serious project, nor used for production. Some features may not be implemented too. ⚠️
 
 
 ## Bonus Features
