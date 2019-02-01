@@ -1,5 +1,7 @@
 # goxy - A TCP tunnel over HTTP
 
+### ⚠️ This project was made for an university (TIIR - Lille) coursework and should not be considered has a serious project, nor used for production. ⚠️
+
 
 ## Bonus Features
 
@@ -70,14 +72,14 @@ To prevent classic (but useful) string matching (like the SSH handshake header) 
 
 ### Long polling
 
-To prevent unnecessary request to know if the server as available data, the server uses long polling. Doing so, if the user do not touch his terminal, no request should be completed.
+To prevent unnecessary request to know if the server as available data, the server uses long polling. Doing so, if the user do not touch his terminal, no request should be completed (except some SSH heartbeats).
 
 
 ### Using OTP
 
 In order to prevent the server from asking data to the server, while the client did not ask for it, the server gives an OTP (One Time Password) for the next read and another one for the next write.
 
-If the server receives a request with an invalid OTP, the server response with a useless 200 response so the proxy dosn't notice a mismatch in the status code.
+If the server receives a request with an invalid OTP, the server response with a useless 200 response so the proxy doesn't notice a mismatch in the status code.
 
 
 ### Use common User-Agents
@@ -126,13 +128,13 @@ Simple SSH connections
 ssh -p 2222 localhost
 ```
 
-SSH Reverse tunnel option can be used to connect from home to the company's computer:
+SSH Reverse tunnel option can be used to connect from home to the company's computer
 
 ```sh
 ssh -p 2222 -R 2222:localhost:22 my.home.com
 ```
 
-Then while at home:
+Then while at home
 
 ```sh
 ssh -p 2222 localhost
